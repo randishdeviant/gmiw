@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Interactive Map Wrapper</title>
+    <!-- Preconnect ke CDN tile & aset Hoyoverse agar DNS + TLS setup lebih cepat -->
+    <link rel="preconnect" href="https://act-webstatic.hoyoverse.com" crossorigin>
+    <link rel="preconnect" href="https://act.hoyolab.com" crossorigin>
+    <link rel="preconnect" href="https://webstatic.hoyoverse.com" crossorigin>
+    <link rel="dns-prefetch" href="https://sg-public-api.hoyolab.com">
+    <link rel="dns-prefetch" href="https://sg-public-api-static.hoyolab.com">
     <style>
         /* Reset & Base Styling */
         * {
@@ -83,10 +89,16 @@
             height: 100%;
             border: none;
             display: none;
-            /* Memaksa hardware acceleration GPU untuk rendering lebih mulus */
-            will-change: transform, opacity;
+            /* GPU compositing layer untuk iframe */
+            will-change: transform;
             transform: translate3d(0, 0, 0);
-            touch-action: manipulation;
+            /*
+             * touch-action: none — beri map JS kontrol penuh atas semua gesture.
+             * Ini mencegah browser 'merebut' touchmove event sebelum map bisa handle,
+             * yang menyebabkan error [Intervention] dan panning terasa patah-patah.
+             * Map Hoyolab menggunakan canvas-based pan/zoom sendiri.
+             */
+            touch-action: none;
         }
 
         /* Animasi Handphone Berputar */
