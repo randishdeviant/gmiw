@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Interactive Map Wrapper</title>
+    <style>
+        /* Reset & Base Styling */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: #121212;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Tampilan Notifikasi Rotasi (Portrait) */
+        #rotate-notice {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            padding: 30px;
+            z-index: 10;
+            position: relative;
+        }
+
+        .icon-phone {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 20px;
+            animation: rotateHint 2.5s ease-in-out infinite;
+        }
+
+        #rotate-notice h2 {
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        #rotate-notice p {
+            font-size: 0.95rem;
+            color: #aaaaaa;
+            line-height: 1.4;
+            max-width: 280px;
+        }
+
+        /* Tombol Pemicu Fullscreen & Load Map */
+        .btn-fullscreen {
+            margin-top: 25px;
+            padding: 12px 24px;
+            background-color: #007aff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+            transition: background 0.2s;
+            display: none; /* Hanya muncul di kondisi tertentu via JS */
+        }
+
+        .btn-fullscreen:active {
+            background-color: #0056b3;
+        }
+
+        /* Optimasi Iframe (Landscape) */
+        #map-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: none;
+            /* Memaksa hardware acceleration GPU untuk rendering lebih mulus */
+            will-change: transform, opacity;
+            transform: translate3d(0, 0, 0);
+            touch-action: manipulation;
+        }
+
+        /* Animasi Handphone Berputar */
+        @keyframes rotateHint {
+            0% { transform: rotate(0deg); }
+            30% { transform: rotate(-90deg); }
+            70% { transform: rotate(-90deg); }
+            100% { transform: rotate(0deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Layar instruksi saat HP dalam posisi tegak -->
+    <div id="rotate-notice">
+        <!-- SVG Icon HP Berputar -->
+        <svg class="icon-phone" viewBox="0 0 24 24" fill="none" stroke="#007aff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <path d="M12 18h.01"></path>
+        </svg>
+        <h2>Mode Landscape Diperlukan</h2>
+        <p>Aktifkan fitur Auto-Rotate pada HP Anda, lalu putar HP ke posisi mendatar untuk membuka map.</p>
+        <button class="btn-fullscreen" id="fs-trigger" onclick="requestFullscreenAndLoad()">Buka Map Fullscreen</button>
+    </div>
+
+    <!-- Elemen Iframe Map yang sudah di-sandbox untuk memotong script iklan/tracking berat -->
+    <iframe 
+        id="map-frame" 
+        loading="eager"
+        sandbox="allow-scripts allow-same-origin allow-forms"
+        allow="fullscreen">
+    </iframe>
+
+    <script>
+        const frame = document.getElementById('map-frame');
+        const notice = document.getElementById('rotate-notice');
+        const fsTriggerBtn = document.getElementById('fs-trigger');
+        
+        // GANTI URL DI BAWAH INI DENGAN LINK MAP GAME KAMU
+        const mapUrl = "https://act.hoyolab.com/ys/app/interactive-map/index.html"; 
+
+        function checkOrientation() {
+            // Mengecek apakah orientasi layar saat ini mendatar (Landscape)
+            const isLandscape = window.innerWidth > window.innerHeight;
+
+            if (isLandscape) {
+                // Jika sudah landscape tapi tombol fullscreen belum diklik (pada beberapa browser)
+                if (!frame.src) {
+                    notice.style.display = 'flex';
+                    fsTriggerBtn.style.display = 'block';
+                } else {
+                    notice.style.display = 'none';
+                    frame.style.display = 'block';
+                }
+            } else {
+                // Jika user menegakkan HP kembali
+                notice.style.display = 'flex';
+                fsTriggerBtn.style.display = 'none';
+                frame.style.display = 'none';
+            }
+        }
+
+        function requestFullscreenAndLoad() {
+            let elem = document.documentElement;
+            
+            // Pemicu Fullscreen API agar Address Bar hilang total
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) { /* Safari / iOS */
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) { /* IE/Edge */
+                elem.msRequestFullscreen();
+            }
+
+            // Lazy load: Isi src iframe hanya setelah user berinteraksi & posisi landscape
+            if (!frame.src) {
+                frame.src = mapUrl;
+            }
+
+            // Sembunyikan notifikasi dan tampilkan map
+            notice.style.display = 'none';
+            frame.style.display = 'block';
+        }
+
+        // Deteksi perubahan ukuran layar (rotasi HP)
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('load', checkOrientation);
+
+        // Mencegah pull-to-refresh bawaan browser di beberapa HP Android agar tidak mengganggu scrolling map
+        document.body.addEventListener('touchmove', function(e) {
+            if(frame.style.display === 'block') {
+                // Biarkan kontrol sentuh sepenuhnya diatur di dalam iframe map
+            }
+        }, { passive: false });
+        
+        // Daftarkan Service Worker untuk Caching Agresif
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker berhasil didaftarkan! Map siap sat-set.', reg.scope))
+                    .catch(err => console.error('Gagal mendaftarkan Service Worker:', err));
+            });
+        }
+
+    </script>
+</body>
+</html>
