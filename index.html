@@ -20,6 +20,7 @@
             color: #ffffff;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             overflow: hidden;
+            overscroll-behavior: none;
         }
 
         /* Tampilan Notifikasi Rotasi (Portrait) */
@@ -111,11 +112,10 @@
         <button class="btn-fullscreen" id="fs-trigger" onclick="requestFullscreenAndLoad()">Buka Map Fullscreen</button>
     </div>
 
-    <!-- Elemen Iframe Map yang sudah di-sandbox untuk memotong script iklan/tracking berat -->
+    <!-- Elemen Iframe Map yang memuat proxy same-origin -->
     <iframe 
         id="map-frame" 
         loading="eager"
-        sandbox="allow-scripts allow-same-origin allow-forms"
         allow="fullscreen">
     </iframe>
 
@@ -125,7 +125,7 @@
         const fsTriggerBtn = document.getElementById('fs-trigger');
         
         // GANTI URL DI BAWAH INI DENGAN LINK MAP GAME KAMU
-        const mapUrl = "https://act.hoyolab.com/ys/app/interactive-map/index.html"; 
+        const mapUrl = "/ys/app/interactive-map/index.html"; 
 
         function checkOrientation() {
             // Mengecek apakah orientasi layar saat ini mendatar (Landscape)
@@ -162,7 +162,13 @@
 
             // Lazy load: Isi src iframe hanya setelah user berinteraksi & posisi landscape
             if (!frame.src) {
-                frame.src = mapUrl;
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(() => {
+                        frame.src = mapUrl;
+                    });
+                } else {
+                    frame.src = mapUrl;
+                }
             }
 
             // Sembunyikan notifikasi dan tampilkan map
@@ -174,13 +180,6 @@
         window.addEventListener('resize', checkOrientation);
         window.addEventListener('load', checkOrientation);
 
-        // Mencegah pull-to-refresh bawaan browser di beberapa HP Android agar tidak mengganggu scrolling map
-        document.body.addEventListener('touchmove', function(e) {
-            if(frame.style.display === 'block') {
-                // Biarkan kontrol sentuh sepenuhnya diatur di dalam iframe map
-            }
-        }, { passive: false });
-        
         // Daftarkan Service Worker untuk Caching Agresif
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
