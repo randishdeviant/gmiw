@@ -8,8 +8,10 @@
     <link rel="preconnect" href="https://act-webstatic.hoyoverse.com" crossorigin>
     <link rel="preconnect" href="https://act.hoyolab.com" crossorigin>
     <link rel="preconnect" href="https://webstatic.hoyoverse.com" crossorigin>
+    <link rel="preconnect" href="https://sdk.hoyolab.com" crossorigin>
     <link rel="dns-prefetch" href="https://sg-public-api.hoyolab.com">
     <link rel="dns-prefetch" href="https://sg-public-api-static.hoyolab.com">
+    <link rel="dns-prefetch" href="https://api-community-v2.hoyolab.com">
     <style>
         /* Reset & Base Styling */
         * {
@@ -124,11 +126,14 @@
         <button class="btn-fullscreen" id="fs-trigger" onclick="requestFullscreenAndLoad()">Buka Map Fullscreen</button>
     </div>
 
-    <!-- Elemen Iframe Map yang memuat proxy same-origin -->
+    <!-- Elemen Iframe Map dengan optimasi kecepatan -->
     <iframe 
         id="map-frame" 
+        src=""
         loading="eager"
-        allow="fullscreen">
+        referrerpolicy="no-referrer"
+        allow="fullscreen"
+        importance="high">
     </iframe>
 
     <script>
@@ -140,20 +145,17 @@
         const mapUrl = "https://act.hoyolab.com/ys/app/interactive-map/index.html";
 
         function checkOrientation() {
-            // Mengecek apakah orientasi layar saat ini mendatar (Landscape)
             const isLandscape = window.innerWidth > window.innerHeight;
 
             if (isLandscape) {
-                // Jika sudah landscape tapi tombol fullscreen belum diklik (pada beberapa browser)
+                // Load iframe immediately for fastest rendering (no user click needed)
                 if (!frame.src) {
-                    notice.style.display = 'flex';
-                    fsTriggerBtn.style.display = 'block';
-                } else {
-                    notice.style.display = 'none';
-                    frame.style.display = 'block';
+                    frame.src = mapUrl;
                 }
+                frame.style.display = 'block';
+                notice.style.display = 'none';
+                fsTriggerBtn.style.display = 'none';
             } else {
-                // Jika user menegakkan HP kembali
                 notice.style.display = 'flex';
                 fsTriggerBtn.style.display = 'none';
                 frame.style.display = 'none';
@@ -172,28 +174,20 @@
                 elem.msRequestFullscreen();
             }
 
-            // Lazy load: Isi src iframe hanya setelah user berinteraksi & posisi landscape
-            if (!frame.src) {
-                frame.src = mapUrl;
-            }
-
-            // Sembunyikan notifikasi dan tampilkan map
+            // Sembunyikan notifikasi dan tampilkan map (sudah di-load di atas)
             notice.style.display = 'none';
             frame.style.display = 'block';
         }
 
+        // Preload iframe src untuk faster rendering ketika landscape
+        const preloadLink = document.createElement('link');
+        preloadLink.rel = 'prefetch';
+        preloadLink.href = mapUrl;
+        document.head.appendChild(preloadLink);
+
         // Deteksi perubahan ukuran layar (rotasi HP)
         window.addEventListener('resize', checkOrientation);
         window.addEventListener('load', checkOrientation);
-
-        // Daftarkan Service Worker untuk Caching Agresif
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('Service Worker berhasil didaftarkan! Map siap sat-set.', reg.scope))
-                    .catch(err => console.error('Gagal mendaftarkan Service Worker:', err));
-            });
-        }
 
     </script>
 </body>
