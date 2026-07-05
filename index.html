@@ -124,8 +124,8 @@
         const notice = document.getElementById('rotate-notice');
         const fsTriggerBtn = document.getElementById('fs-trigger');
         
-        // GANTI URL DI BAWAH INI DENGAN LINK MAP GAME KAMU
-        const mapUrl = "/ys/app/interactive-map/index.html"; 
+        // URL map interactive Genshin Impact
+        const mapUrl = "https://act.hoyolab.com/ys/app/interactive-map/index.html";
 
         function checkOrientation() {
             // Mengecek apakah orientasi layar saat ini mendatar (Landscape)
@@ -162,13 +162,7 @@
 
             // Lazy load: Isi src iframe hanya setelah user berinteraksi & posisi landscape
             if (!frame.src) {
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.ready.then(() => {
-                        frame.src = mapUrl;
-                    });
-                } else {
-                    frame.src = mapUrl;
-                }
+                frame.src = mapUrl;
             }
 
             // Sembunyikan notifikasi dan tampilkan map

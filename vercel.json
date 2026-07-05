@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/ys/app/interactive-map/:path*",
-      "destination": "https://act.hoyolab.com/ys/app/interactive-map/:path*"
-    }
-  ]
-}
