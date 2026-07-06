@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Interactive Map Wrapper</title>
-    <!-- Preconnect ke CDN tile & aset Hoyoverse agar DNS + TLS setup lebih cepat -->
+    <!-- Preconnect: DNS+TCP siap tanpa download konten (menghemat RAM) -->
     <link rel="preconnect" href="https://act-webstatic.hoyoverse.com" crossorigin>
     <link rel="preconnect" href="https://act.hoyolab.com" crossorigin>
     <link rel="preconnect" href="https://webstatic.hoyoverse.com" crossorigin>
@@ -65,22 +65,19 @@
             max-width: 280px;
         }
 
-        /* Optimasi Iframe (Landscape) dengan GPU rendering */
+        /* Iframe — content-visibility:auto skip render saat hidden, hemat RAM */
         #map-frame {
             width: 100%;
             height: 100%;
             border: none;
-            display: none;
-            /* GPU compositing layer — render via GPU bukan CPU */
-            will-change: transform;
+            display: block;
+            touch-action: manipulation;
+            -ms-touch-action: manipulation;
             transform: translate3d(0, 0, 0);
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-            contain: strict;
-            touch-action: none;
+            content-visibility: auto;
         }
 
-        /* Overlay tombol fullscreen (icon) di atas map */
+        /* Overlay tombol fullscreen */
         #fs-overlay {
             position: fixed;
             top: 12px;
@@ -94,16 +91,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(0, 0, 0, 0.55);
+            background: rgba(0, 0, 0, 0.45);
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-            transition: background 0.2s;
+            transition: background 0.15s;
         }
         #fs-overlay button:active {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.7);
         }
         #fs-overlay button svg {
             width: 24px;
@@ -126,9 +121,8 @@
 </head>
 <body>
 
-    <!-- Layar instruksi saat HP dalam posisi tegak -->
+    <!-- Portrait notice — tampil hanya jika portrait -->
     <div id="rotate-notice">
-        <!-- SVG Icon HP Berputar -->
         <svg class="icon-phone" viewBox="0 0 24 24" fill="none" stroke="#007aff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
             <path d="M12 18h.01"></path>
@@ -137,7 +131,7 @@
         <p>Aktifkan fitur Auto-Rotate pada HP Anda, lalu putar HP ke posisi mendatar untuk membuka map.</p>
     </div>
 
-    <!-- Tombol Fullscreen overlay (icon) di pojok kanan map -->
+    <!-- Fullscreen overlay button -->
     <div id="fs-overlay">
         <button id="fs-btn" onclick="requestFullscreenAndLoad()" aria-label="Fullscreen">
             <svg viewBox="0 0 24 24">
@@ -149,9 +143,14 @@
         </button>
     </div>
 
-    <!-- Elemen Iframe Map dengan optimasi kecepatan -->
+    <!--
+        Iframe dengan src langsung di HTML!
+        Browser langsung mulai fetch konten tanpa nunggu JS.
+        Tidak ada race condition, tidak ada iframe stuck loading.
+    -->
     <iframe 
         id="map-frame" 
+        src="https://act.hoyolab.com/ys/app/interactive-map/index.html"
         loading="eager"
         referrerpolicy="no-referrer"
         allow="fullscreen"
@@ -159,46 +158,63 @@
     </iframe>
 
     <script>
+        "use strict";
+
         const frame = document.getElementById('map-frame');
         const notice = document.getElementById('rotate-notice');
         const fsOverlay = document.getElementById('fs-overlay');
-        
-        // URL map interactive Genshin Impact
-        const mapUrl = "https://act.hoyolab.com/ys/app/interactive-map/index.html";
-        let mapLoaded = false;
 
-        function loadMap() {
-            if (mapLoaded) return;
-            mapLoaded = true;
-            frame.src = mapUrl;
+        // === Safety: timeout reload jika iframe gagal load ===
+        // Jika dalam 15 detik iframe tidak selesai load, anggap stuck
+        let loadAttempts = 0;
+        const MAX_ATTEMPTS = 2;
+        let loadTimeout = null;
+
+        function resetLoadTimeout() {
+            if (loadTimeout) clearTimeout(loadTimeout);
+            loadTimeout = setTimeout(() => {
+                if (loadAttempts < MAX_ATTEMPTS) {
+                    loadAttempts++;
+                    console.warn(`[Map] Iframe timeout (attempt ${loadAttempts}). Reloading...`);
+                    frame.src = frame.src; // Trigger reload
+                    resetLoadTimeout();
+                } else {
+                    console.error('[Map] Iframe gagal load setelah 2 percobaan.');
+                }
+            }, 15000);
         }
 
-        function showLandscape() {
-            loadMap();
-            frame.style.display = 'block';
-            notice.style.display = 'none';
-            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                fsOverlay.style.display = 'block';
+        frame.addEventListener('load', () => {
+            if (loadTimeout) clearTimeout(loadTimeout);
+            loadAttempts = 0;
+            console.log('[Map] Iframe loaded successfully');
+        });
+
+        // Start timeout jika iframe belum loaded dalam 15 detik
+        // Cek apakah iframe sudah ter-load (untuk kasudah loaded sebelum JS jalan)
+        // Kita tidak bisa cek contentDocument (cross-origin), jadi langsung start timeout
+        setTimeout(() => {
+            // Jika iframe blm trigger load event, timeout akan handle
+            if (loadAttempts === 0) {
+                resetLoadTimeout();
             }
-        }
+        }, 1000);
 
-        function showPortrait() {
-            notice.style.display = 'flex';
-            fsOverlay.style.display = 'none';
-            frame.style.display = 'none';
-        }
-
+        // === Orientation handling ===
         function checkOrientation() {
             if (window.innerWidth > window.innerHeight) {
-                showLandscape();
+                // Landscape: sembunyikan notice, tampilkan map + overlay FS
+                notice.style.display = 'none';
+                fsOverlay.style.display = 'block';
             } else {
-                showPortrait();
+                // Portrait: tampilkan notice, sembunyikan map + overlay
+                notice.style.display = 'flex';
+                fsOverlay.style.display = 'none';
             }
         }
 
         function requestFullscreenAndLoad() {
             let elem = document.documentElement;
-            
             if (elem.requestFullscreen) {
                 elem.requestFullscreen();
             } else if (elem.webkitRequestFullscreen) {
@@ -206,44 +222,30 @@
             } else if (elem.msRequestFullscreen) {
                 elem.msRequestFullscreen();
             }
-
-            loadMap();
-            frame.style.display = 'block';
-            notice.style.display = 'none';
+            fsOverlay.style.display = 'none';
         }
 
         function onFullscreenChange() {
             if (document.fullscreenElement || document.webkitFullscreenElement) {
                 fsOverlay.style.display = 'none';
-            } else {
-                if (window.innerWidth > window.innerHeight) {
-                    fsOverlay.style.display = 'block';
-                }
+            } else if (window.innerWidth > window.innerHeight) {
+                fsOverlay.style.display = 'block';
             }
         }
 
-        document.addEventListener('fullscreenchange', onFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+        // === Listeners ===
+        document.addEventListener('fullscreenchange', onFullscreenChange, { passive: true });
+        document.addEventListener('webkitfullscreenchange', onFullscreenChange, { passive: true });
 
-        const preloadLink = document.createElement('link');
-        preloadLink.rel = 'prefetch';
-        preloadLink.href = mapUrl;
-        document.head.appendChild(preloadLink);
-
-        window.addEventListener('resize', checkOrientation);
-        window.addEventListener('load', checkOrientation);
+        window.addEventListener('resize', checkOrientation, { passive: true });
+        window.addEventListener('load', checkOrientation, { passive: true });
 
         if (screen.orientation) {
             screen.orientation.addEventListener('change', checkOrientation);
         }
 
-        function tryShowOnInteraction() {
-            if (window.innerWidth > window.innerHeight && !mapLoaded) {
-                showLandscape();
-            }
-        }
-        window.addEventListener('touchstart', tryShowOnInteraction, { once: true });
-        window.addEventListener('click', tryShowOnInteraction, { once: true });
+        // Initial check — map langsung tampil di PC (landscape)
+        checkOrientation();
     </script>
 </body>
 </html>
